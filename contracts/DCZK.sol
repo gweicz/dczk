@@ -2,8 +2,16 @@
 
 pragma solidity ^0.5.16;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20Detailed.sol";
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
 
 interface IVat {
     function hope(address) external;
@@ -18,25 +26,37 @@ interface IPot {
     function chi() external view returns (uint256);
     function rho() external view returns (uint256);
     function dsr() external view returns (uint256);
-    function pie(address) view external returns (uint256);
+    function pie(address) external view returns (uint256);
     function drip() external returns (uint256);
     function join(uint256) external;
     function exit(uint256) external;
 }
 
-contract DCZK is ERC20, ERC20Detailed {
+contract DCZK is IERC20 {
 
-    // --- Events ---
-    event Transfer(address indexed src, address indexed dst, uint wad);
-    event Mint(address indexed to, uint256 amount);
-    event Burn(address indexed burner, uint256 amount);
+    // --- ERC20 Events ---
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+
+    // --- Other events ---
+    event TransferPrincipal(address indexed from, address indexed to, uint256 principal, uint256 value);
+    event Mint(address indexed to, uint256 amount, uint256 principal);
+    event Burn(address indexed burner, uint256 amount, uint256 principal);
     event Buy(address indexed buyer, uint256 dczk, uint256 dai);
     event Sell(address indexed seller, uint256 dczk, uint256 dai);
     event AddLiquidity(uint256 rate, uint256 amount);
     event RateUpdate(uint256 rate, address caller);
 
+    // --- ERC20 basic vars ---
+    string private _name = "dCZK Test v0.2";
+    string private _symbol = "dCZK02";
+    uint8 private _decimals = 18;
+    mapping (address => uint256) private _balances;
+    mapping (address => mapping (address => uint256)) private _allowances;
+    uint256 private _totalSupply;
+
     // --- Data ---
-    ERC20 public depositToken;
+    IERC20 public depositToken;
     IVat public vat;
     IDaiJoin public daiJoin;
     IPot public pot;
@@ -49,7 +69,7 @@ contract DCZK is ERC20, ERC20Detailed {
 
     // fixed oracleAdress - will be not included in mainnet release
     address public oracleAddress = 0x89188bE35B16AF852dC0A4a9e47e0cA871fadf9a;
-    
+
     uint16 constant fee = 400;  // 0.25%
 
     struct Thread {
@@ -58,11 +78,12 @@ contract DCZK is ERC20, ERC20Detailed {
     }
     mapping(uint => Thread) public txs;
 
+
     // --- Init ---
-    constructor (address _dai, address _vat, address _daiJoin, address _pot) public ERC20Detailed("dCZK01", "dCZK Test v0.1", 18) {
+    constructor (address _dai, address _vat, address _daiJoin, address _pot) public {
         // set DAI address
-        depositToken = ERC20(_dai);
-        
+        depositToken = IERC20(_dai);
+
         // DSR - DAI Savings Rate
         daiJoin = IDaiJoin(_daiJoin);
         vat = IVat(_vat);
@@ -79,14 +100,13 @@ contract DCZK is ERC20, ERC20Detailed {
     // https://github.com/makerdao/dss/blob/master/src/pot.sol
 
     uint constant RAY = 10 ** 27;
-    /* solium-disable */
     function rpow(uint x, uint n, uint base) internal pure returns (uint z) {
         assembly {
             switch x case 0 {switch n case 0 {z := base} default {z := 0}}
             default {
                 switch mod(n, 2) case 0 { z := base } default { z := x }
                 let half := div(base, 2)  // for rounding.
-                for { n := div(n, 2) } n { n := div(n,2) } {
+                for { n := div(n, 2) } n { n := div(n,2) } { // solium-disable-line
                     let xx := mul(x, x)
                     if iszero(eq(div(xx, x), x)) { revert(0,0) }
                     let xxRound := add(xx, half)
@@ -109,7 +129,11 @@ contract DCZK is ERC20, ERC20Detailed {
     }
 
     function sub(uint x, uint y) internal pure returns (uint z) {
-        require((z = x - y) <= x);
+        return sub(x, y, "SafeMath: subtraction overflow");
+    }
+
+    function sub(uint x, uint y, string memory err) internal pure returns (uint z) {
+        require((z = x - y) <= x, err);
     }
 
     function mul(uint x, uint y) internal pure returns (uint z) {
@@ -130,26 +154,89 @@ contract DCZK is ERC20, ERC20Detailed {
         // always rounds up
         z = add(mul(x, RAY), sub(y, 1)) / y;
     }
-    /* solium-enable */
 
-    // --- ERC20 Token overrides ---
+    // --- ERC20 Token ---
 
-    function balanceOf(address account) public view returns (uint) {
-        return rmul(_chi(), super.balanceOf(account));
+    function name() public view returns (string memory) {
+        return _name;
+    }
+
+    function symbol() public view returns (string memory) {
+        return _symbol;
+    }
+
+    function decimals() public view returns (uint8) {
+        return _decimals;
     }
 
     function totalSupply() public view returns (uint256) {
-        return rmul(_chi(), super.totalSupply());
+        return rmul(_chi(), _totalSupply);
+    }
+
+    function balanceOf(address account) public view returns (uint) {
+        return rmul(_chi(), _balances[account]);
+    }
+
+    function transfer(address recipient, uint256 amount) public returns (bool) {
+        _transfer(msg.sender, recipient, amount);
+        return true;
+    }
+
+    function allowance(address owner, address spender) public view returns (uint256) {
+        return _allowances[owner][spender];
+    }
+
+    function approve(address spender, uint256 amount) public returns (bool) {
+        _approve(msg.sender, spender, amount);
+        return true;
+    }
+
+    function transferFrom(address sender, address recipient, uint256 amount) public returns (bool) {
+        _transfer(sender, recipient, amount);
+        _approve(sender, msg.sender, sub(_allowances[sender][msg.sender], amount, "ERC20: transfer amount exceeds allowance"));
+        return true;
+    }
+
+    function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
+        _approve(msg.sender, spender, add(_allowances[msg.sender][spender], addedValue));
+        return true;
+    }
+
+    function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
+        _approve(msg.sender, spender, sub(_allowances[msg.sender][spender], subtractedValue, "ERC20: decreased allowance below zero"));
+        return true;
+    }
+
+    function _transfer(address sender, address recipient, uint256 amount) internal {
+        require(sender != address(0), "ERC20: transfer from the zero address");
+        require(recipient != address(0), "ERC20: transfer to the zero address");
+
+        uint256 chi = (now > pot.rho()) ? pot.drip() : pot.chi();
+        uint pie = rdiv(amount, chi);
+
+        _balances[sender] = sub(_balances[sender], pie, "ERC20: transfer amount exceeds balance");
+        _balances[recipient] = add(_balances[recipient], pie);
+
+        emit Transfer(sender, recipient, amount);
+        emit TransferPrincipal(sender, recipient, pie, amount);
+    }
+
+    function _approve(address owner, address spender, uint256 amount) internal {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
     }
 
     // --- Principal balances ---
 
     function principalBalanceOf(address account) public view returns (uint) {
-        return super.balanceOf(account);
+        return _balances[account];
     }
 
     function principalTotalSupply() public view returns (uint256) {
-        return super.totalSupply();
+        return _totalSupply;
     }
 
     // --- DSR (DAI Savings rate) integration ---
@@ -184,33 +271,48 @@ contract DCZK is ERC20, ERC20Detailed {
     // --- Minting (internal) ---
 
     function _mint(address dst, uint256 czk, uint256 dai) private {
+        require(dst != address(0), "ERC20: mint to the zero address");
+
         uint256 chi = (now > pot.rho()) ? pot.drip() : pot.chi();
         uint pie = rdiv(dai, chi);
         daiJoin.join(address(this), dai);
         pot.join(pie);
         uint spie = rdiv(czk, chi);
-        super._mint(dst, spie);
-        emit Mint(dst, czk);
+
+        _totalSupply = add(_totalSupply, spie);
+        _balances[dst] = add(_balances[dst], spie);
+
+        emit Transfer(address(0), dst, czk);
+        emit TransferPrincipal(address(0), dst, spie, czk);
+        emit Mint(dst, czk, spie);
     }
 
     // --- Burning (internal) ---
 
     function _burn(address src, uint256 czk, uint256 dai) private {
+        require(src != address(0), "ERC20: burn from the zero address");
         require(balanceOf(src) >= czk, "dczk/insufficient-balance");
+
         uint chi = (now > pot.rho()) ? pot.drip() : pot.chi();
         uint spie = rdivup(czk, chi);
-        super._burn(src, spie);
+
+        _balances[src] = sub(_balances[src], spie, "ERC20: burn amount exceeds balance");
+        _totalSupply = sub(_totalSupply, spie);
+
         uint pie = rdivup(dai, chi);
         if (pie != 0) {
             pot.exit(pie);
             daiJoin.exit(msg.sender, rmul(chi, pie));
         }
-        // send to DEX - rmul(chi, wad)
-        emit Burn(src, czk);
+
+        _approve(src, msg.sender, sub(_allowances[src][address(this)], czk, "ERC20: burn amount exceeds allowance"));
+        emit Transfer(src, address(0), czk);
+        emit TransferPrincipal(src, address(0), spie, czk);
+        emit Burn(src, czk, spie);
     }
 
     // --- DEX Decentralized exchange ---
-    
+
     function _addLiquidity(uint256 amount) internal {
         if (txs[rate].amount == 0 && maxRate != 0) {
             uint currentRate = maxRate;
@@ -263,7 +365,7 @@ contract DCZK is ERC20, ERC20Detailed {
 
         // mint tokens
         _mint(address(msg.sender), _converted, rest);
-        
+
         emit Buy(msg.sender, _converted, rest);
     }
 

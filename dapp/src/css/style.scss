@@ -13,6 +13,19 @@
   @extend .dczk-token;
   background-image: url(../img/eth.svg);
 }
+.token-DCZK {
+  @extend .dczk-token;
+  background-image: url(../img/dczk.png);
+}
+
+.logo {
+  width: 75px;
+  height: 75px;
+  display: inline-block;
+  background-size: 75px 75px;
+  background-image: url(../img/dczk.png);
+  margin-right: 1em;
+}
 
 .dczk-tokens {
   td {

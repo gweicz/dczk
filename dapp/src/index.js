@@ -104,6 +104,7 @@ class DCZK {
     console.log(`dCZK version ${this.version}`)
     contracts.DCZK.address = this.versionData.dczk
     contracts.DCZK.abi = this.versionData.abi
+    //tokens.DCZK.symbol = 'dCZK' + this.version.replace('.', '')
 
     this.accounts = accounts
     this.user = this.accounts[0]
@@ -565,7 +566,8 @@ const Page = {
           }
           return m('.section', { style: 'padding-top: 0;' }, [
             m(`article.message.is-${msg.type || 'is-primary'}`, [
-              m('.message-body', msg.arr)
+              m('.message-header', msg.arr[0]),
+              m('.message-body', msg.arr.slice(1))
             ])
           ])
         }
@@ -694,6 +696,23 @@ const Page = {
       m('.container', [
         m('.section', { style: 'padding-bottom: 0;' }, [
           m('h2.title.is-4', 'Mincovna'),
+          data.balances.DAI > 0 ? '' : m(`article.message.is-info`, [
+            m('.message-body', [
+              m('b', 'Jak získat testovací Kovan DAI?'),
+              m('p', [
+                '1. Zažádejte si o Kovan ETH - ',
+                m('a', { href: 'https://faucet.kovan.network/', target: '_blank' }, 'Kovan Faucet'),
+                ' (nutný GitHub účet) nebo ',
+                m('a', { href: '', target: '_blank' }, 'Gitter - kovan-testnet/faucet'),
+                ' (nutný GitHub/GitLab/Twitter účet).'
+              ]),
+              m('p', [
+                '2. Když už máte Kovan ETH, tak použijte standartní postup pro generování DAI, tedy - Kovan ETH uzamkněte v MakerDAO kontraktu a vygenerujte si Kovan DAI - ',
+                m('a', { href: 'https://mcd-cdp-portal-git-develop.mkr-js-prod.now.sh/borrow?network=kovan', target: '_blank' }, 'MakerDAO Kovan'),
+                '.',
+              ])
+            ])
+          ]),
           m('.tile.is-ancestor', (!dczk || !data.balances.DAI) ? '..' : [
             m('.tile.is-parent', [
               m('article.tile.is-child.box', [
@@ -952,7 +971,8 @@ const Layout = {
             m('.level', [
               m('.level-left', [
                 m('.level-item', [
-                  m('h1.title', 'dCZK DEX testnet | Decentralizovaná Koruna')
+                  m('.logo'),
+                  m('h1.title', 'dCZK DEX | Decentralizovaná Koruna')
                 ])
               ]),
               m('.level-right', [

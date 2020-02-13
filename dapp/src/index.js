@@ -1,7 +1,7 @@
 /* global Web3, web3, ethereum */
 
 const m = require('mithril')
-//const Web3 = require('web3')
+// const Web3 = require('web3')
 const numeral = require('numeral')
 const dateFns = require('date-fns')
 const { cs } = require('date-fns/locale')
@@ -86,7 +86,7 @@ function num (n, dp = 2) {
     return `< ${min}`
   }
   if (Number(n) === 0) {
-    return String(0);
+    return String(0)
   }
   // const val = Math.floor(Number(n) * mp) / mp
   return numeral(n).format(`0,0.${'0'.repeat(dp)}`)
@@ -104,7 +104,7 @@ class DCZK {
     console.log(`dCZK version ${this.version}`)
     contracts.DCZK.address = this.versionData.dczk
     contracts.DCZK.abi = this.versionData.abi
-    //tokens.DCZK.symbol = 'dCZK' + this.version.replace('.', '')
+    // tokens.DCZK.symbol = 'dCZK' + this.version.replace('.', '')
 
     this.accounts = accounts
     this.user = this.accounts[0]
@@ -201,21 +201,21 @@ class DCZK {
 
   setAllowance (cn, n = null) {
     return async () => {
-      //const k = `${cn}_approve`
-      //const v = state[k]
+      // const k = `${cn}_approve`
+      // const v = state[k]
       const val = n !== null ? n : new web3.utils.BN(MAX_INT)
       const opts = {
         from: this.user
       }
       const tx = await this[cn.toLowerCase()].methods.approve(contracts.DCZK.address, val).send(opts)
       console.log(tx)
-      //state[k] = null
+      // state[k] = null
     }
   }
 
   rateUpdates () {
     return web3.eth.getBlockNumber((err, block) => {
-      return this.dczk.getPastEvents('RateUpdate', { fromBlock: block-2000 }, (err, logs) => {
+      return this.dczk.getPastEvents('RateUpdate', { fromBlock: block - 10000 }, (err, logs) => {
         return Promise.all(logs.map(l => {
           return web3.eth.getBlock(l.blockNumber).then(block => {
             return {
@@ -234,7 +234,7 @@ class DCZK {
   }
 
   lastOrders () {
-    function getOrder(l, type) {
+    function getOrder (l, type) {
       return web3.eth.getBlock(l.blockNumber).then(block => {
         return {
           type,
@@ -256,14 +256,14 @@ class DCZK {
     }
     return web3.eth.getBlockNumber().then(block => {
       return Promise.all([
-        this.dczk.getPastEvents('Buy', { fromBlock: block-50000 }).then(logs => {
+        this.dczk.getPastEvents('Buy', { fromBlock: block - 50000 }).then(logs => {
           return addOrders(logs, 'buy')
         }),
-        this.dczk.getPastEvents('Sell', { fromBlock: block-50000 }).then(logs => {
+        this.dczk.getPastEvents('Sell', { fromBlock: block - 50000 }).then(logs => {
           return addOrders(logs, 'sell')
         })
       ]).then(orders => {
-        data.orders = [].concat.apply([], orders).sort((x,y) => x.block > y.block ? -1 : 1)
+        data.orders = [].concat.apply([], orders).sort((x, y) => x.block > y.block ? -1 : 1)
         m.redraw()
       })
     })
@@ -304,8 +304,8 @@ class DCZK {
         }
       }
     }
-    //console.log(out, data.buy, data.sell)
-    return out.sort((x,y) => Number(x.rate) < Number(y.rate) ? 1 : -1 )
+    // console.log(out, data.buy, data.sell)
+    return out.sort((x, y) => Number(x.rate) < Number(y.rate) ? 1 : -1)
   }
 
   priceWithoutFeeBN (n) {
@@ -336,10 +336,10 @@ class DCZK {
 
   calcSellPrice (n) {
     if (!data.rates) {
-      return [ 0 ]
+      return [0]
     }
     if (!this.checkInputNumber(n)) {
-      return [ -2 ]
+      return [-2]
     }
     const rts = [].concat(data.rates)
     const changes = []
@@ -355,10 +355,10 @@ class DCZK {
       const currentRateBN = new this.BN(this.toWei(currentRate.rate))
       const currentRateAmount = new this.BN(this.toWei(currentRate.amount))
       const full = currentRateAmount.mul(currentRateBN).div(this.ONE)
-      //console.log(currentRate, currentRateBN.toString(), currentRateAmount.toString(), full.toString(), amount.toString(), full.gt(amount))
-      /*if (full.sub(amount).lt(zero)) {
+      // console.log(currentRate, currentRateBN.toString(), currentRateAmount.toString(), full.toString(), amount.toString(), full.gt(amount))
+      /* if (full.sub(amount).lt(zero)) {
         return -1
-      }*/
+      } */
       if (full.gt(amount)) {
         const partialAmount = amount.mul(this.ONE).div(currentRateBN)
         deposit = deposit.add(partialAmount)
@@ -373,10 +373,10 @@ class DCZK {
         currentRate = nextRate
       }
       if (!nextRate && amount.gt(new this.BN(0))) {
-        return [ -1, changes ];
+        return [-1, changes]
       }
     }
-    return [ this.fromWei(deposit), changes ]
+    return [this.fromWei(deposit), changes]
   }
 
   sellPrice (n) {
@@ -435,11 +435,10 @@ class DCZK {
         }
       })
     ]).then(() => m.redraw())
-
   }
 
   refresh () {
-    //resetData()
+    // resetData()
     return Promise.all([
       this.data(),
       this.threads(),
@@ -455,6 +454,7 @@ let dczk = null
 const maxAllowance = 100000000000000
 
 function changeVersion (e) {
+  resetData()
   currentVersion = e.target.value
   dczk = window.dczk = new DCZK(dczk.accounts, e.target.value)
   dczk.init().then(ok => {
@@ -485,7 +485,7 @@ async function loadWeb3 () {
 function changeAmount (type, amount) {
   return () => {
     const tk = type === 'buy' ? 'DAI' : 'DCZK'
-    updateState(type)({ target: { value: amount === 1 ? data.balances[tk] : dczk.calcRateTargetAmount(data.balances[tk], amount) }})
+    updateState(type)({ target: { value: amount === 1 ? data.balances[tk] : dczk.calcRateTargetAmount(data.balances[tk], amount) } })
     return false
   }
 }
@@ -500,10 +500,10 @@ window.addEventListener('load', () => {
       ethereum.enable().then(() => {
         loadWeb3()
       })
-      ethereum.on("networkChanged", () => {
+      ethereum.on('networkChanged', () => {
         loadWeb3()
       })
-      ethereum.on("accountsChanged", () => {
+      ethereum.on('accountsChanged', () => {
         loadWeb3()
       })
       // Acccounts now exposed
@@ -642,7 +642,7 @@ const Page = {
                   m('th', { width: 100 }, 'Mince'),
                   m('th', { width: 300 }, 'Zůstatek'),
                   m('th', { align: 'center', width: 130 }, 'Oprávnění'),
-                  //m('th', { width: 200, colspan: 2 }, 'Úprava odemknuté částky'),
+                  // m('th', { width: 200, colspan: 2 }, 'Úprava odemknuté částky'),
                   m('th', 'Kontrakt')
                 ])
               ]),
@@ -666,24 +666,24 @@ const Page = {
                   ]),
                   m('td', { align: 'center' }, [
                     m('div', t.approve === false ? '-' : [
-                      //(data.allowances[tk] ? m('span', { title: data.allowances[tk] }, num(data.allowances[tk], t.dp)) : '..'),
-                      //(approved ? m('small', { style: 'color: green;' }, ` +${approved}`) : '')
+                      // (data.allowances[tk] ? m('span', { title: data.allowances[tk] }, num(data.allowances[tk], t.dp)) : '..'),
+                      // (approved ? m('small', { style: 'color: green;' }, ` +${approved}`) : '')
                       data.allowances[tk]
                         ? data.allowances[tk] && data.allowances[tk] >= maxAllowance
-                            ? m('span', { style: 'cursor: pointer;', onclick: dczk.setAllowance(t.contract, 0), title: 'Uzamknout '+t.symbol }, fa('fas fa-lock-open'))
-                            : [
-                                m('span', { style: 'cursor: pointer', onclick: dczk.setAllowance(t.contract), title: 'Odemknout '+t.symbol }, fa('fas fa-lock')),
-                                //m('button.button.is-small.is-primary', { style: 'margin-left: 1.5em;', onclick: dczk.setAllowance(t.contract) }, 'Odemknout')
-                            ]
+                          ? m('span', { style: 'cursor: pointer;', onclick: dczk.setAllowance(t.contract, 0), title: 'Uzamknout ' + t.symbol }, fa('fas fa-lock-open'))
+                          : [
+                            m('span', { style: 'cursor: pointer', onclick: dczk.setAllowance(t.contract), title: 'Odemknout ' + t.symbol }, fa('fas fa-lock'))
+                            // m('button.button.is-small.is-primary', { style: 'margin-left: 1.5em;', onclick: dczk.setAllowance(t.contract) }, 'Odemknout')
+                          ]
                         : '..'
                     ])
                   ]),
-                  /*m('td', [
+                  /* m('td', [
                     t.approve === false ? '' : m('input.input.is-small', { oninput: updateState(`${t.contract}_approve`), value: approved })
-                  ]),*/
-                  /*m('td', [
+                  ]), */
+                  /* m('td', [
                     t.approve === false ? '' : m('button.button.is-small', { onclick: dczk.setAllowance(t.contract), disabled: !approved, class: approved ? 'is-primary' : '' }, 'Upravit')
-                  ]),*/
+                  ]), */
                   m('td', [
                     !addr ? '-' : m('a', { href: `https://kovan.etherscan.io/token/${addr}?a=${dczk.user}`, target: '_blank' }, addr)
                   ])
@@ -696,7 +696,7 @@ const Page = {
       m('.container', [
         m('.section', { style: 'padding-bottom: 0;' }, [
           m('h2.title.is-4', 'Mincovna'),
-          data.balances.DAI > 0 ? '' : m(`article.message.is-info`, [
+          data.balances.DAI > 0 ? '' : m('article.message.is-info', [
             m('.message-body', [
               m('b', 'Jak získat testovací Kovan DAI?'),
               m('p', [
@@ -709,7 +709,7 @@ const Page = {
               m('p', [
                 '2. Když už máte Kovan ETH, tak použijte standartní postup pro generování DAI, tedy - Kovan ETH uzamkněte v MakerDAO kontraktu a vygenerujte si Kovan DAI - ',
                 m('a', { href: 'https://mcd-cdp-portal-git-develop.mkr-js-prod.now.sh/borrow?network=kovan', target: '_blank' }, 'MakerDAO Kovan'),
-                '.',
+                '.'
               ])
             ])
           ]),
@@ -726,14 +726,14 @@ const Page = {
                         data.balances.DAI <= 0 ? '' : m('.level-right.amounts', [
                           m('.level-item', m('a', { onclick: changeAmount('buy', '0.25') }, '25%')),
                           m('.level-item', m('a', { onclick: changeAmount('buy', '0.50') }, '50%')),
-                          m('.level-item', m('a', { onclick: changeAmount('buy', '1') }, '100%')),
+                          m('.level-item', m('a', { onclick: changeAmount('buy', '1') }, '100%'))
                         ])
                       ])
                     ]),
                     m('.control.has-text-right', [
                       m('input.input', { placeholder: 'Zadejte počet DAI', oninput: updateState('buy'), value: state.buy }),
                       m('span.text.is-right', 'DAI')
-                    ]),
+                    ])
                   ]),
                   m('.field', m({
                     view () {
@@ -750,7 +750,7 @@ const Page = {
                         state.buy ? m('p.help', [
                           'Kurz: ',
                           m('b', { title: rate }, num(rate, 4)),
-                          ' dCZK/DAI, včetně poplatku: 0.25%',
+                          ' dCZK/DAI, včetně poplatku: 0.25%'
                         ]) : ''
                       ]
                     }
@@ -759,11 +759,11 @@ const Page = {
                     (data.allowances.DAI && data.allowances.DAI < maxAllowance) ? m('p.control', [
                       m('button.button.is-primary', { onclick: dczk.setAllowance('DAI') }, [
                         m('span.icon', fa('fas fa-unlock')),
-                        m('span', 'Odemknout DAI'),
+                        m('span', 'Odemknout DAI')
                       ])
                     ]) : m('p.control', [
-                      m('button.button', { disabled: !(state.buy && data.balances.DAI >= Number(state.buy)), class: state.buy ? (data.balances.DAI >= Number(state.buy) ? 'is-primary' : 'is-danger') : '', onclick: dczk.buy() }, `Vyrazit dCZK`)
-                    ]),
+                      m('button.button', { disabled: !(state.buy && data.balances.DAI >= Number(state.buy)), class: state.buy ? (data.balances.DAI >= Number(state.buy) ? 'is-primary' : 'is-danger') : '', onclick: dczk.buy() }, 'Vyrazit dCZK')
+                    ])
                   ])
                 ])
               ])
@@ -780,7 +780,7 @@ const Page = {
                         data.balances.DCZK <= 0 ? '' : m('.level-right.amounts', [
                           m('.level-item', m('a', { onclick: changeAmount('sell', '0.25') }, '25%')),
                           m('.level-item', m('a', { onclick: changeAmount('sell', '0.50') }, '50%')),
-                          m('.level-item', m('a', { onclick: changeAmount('sell', '1') }, '100%')),
+                          m('.level-item', m('a', { onclick: changeAmount('sell', '1') }, '100%'))
                         ])
                       ])
                     ]),
@@ -801,7 +801,7 @@ const Page = {
                         rate ? m('p.help', [
                           'Kurz: ',
                           m('b', { title: rate }, num(rate, 4)),
-                          ' dCZK/DAI, poplatek: 0%',
+                          ' dCZK/DAI, poplatek: 0%'
                         ]) : ''
                       ]
                     }
@@ -810,10 +810,10 @@ const Page = {
                     (data.allowances.DCZK && data.allowances.DCZK < maxAllowance) ? m('p.control', [
                       m('button.button.is-primary', { onclick: dczk.setAllowance('DCZK') }, [
                         m('span.icon', fa('fas fa-unlock')),
-                        m('span', 'Odemknout dCZK'),
+                        m('span', 'Odemknout dCZK')
                       ])
                     ]) : m('.control', [
-                      m('button.button', { disabled: !(state.sell && data.balances.DCZK >= Number(state.sell)), class: state.sell ? (data.balances.DCZK >= Number(state.sell) ? 'is-primary' : 'is-danger') : '', onclick: dczk.sell() }, `Spálit dCZK`)
+                      m('button.button', { disabled: !(state.sell && data.balances.DCZK >= Number(state.sell)), class: state.sell ? (data.balances.DCZK >= Number(state.sell) ? 'is-primary' : 'is-danger') : '', onclick: dczk.sell() }, 'Spálit dCZK')
                     ])
                   ])
                 ])
@@ -831,7 +831,7 @@ const Page = {
                 return ''
               }
               const rts = dczk.updatedRates(data.rates, state.buy, state.sell)
-              //const rts = data.rates
+              // const rts = data.rates
               return [
                 m('table.table.is-fullwidth.rates', [
                   m('thead', [
@@ -850,15 +850,15 @@ const Page = {
                         m('td', [
                           m('div', { title: rt.amount }, [
                             rt.amount,
-                            rt.added ? m('small', ' → '+dczk.add(rt.amount, rt.added)) : '',
-                            rt.subtracted ? m('small', ' → '+dczk.sub(rt.amount, rt.subtracted)) : ''
+                            rt.added ? m('small', ' → ' + dczk.add(rt.amount, rt.added)) : '',
+                            rt.subtracted ? m('small', ' → ' + dczk.sub(rt.amount, rt.subtracted)) : ''
                           ])
                         ]),
                         m('td', [
                           m('div', [
                             dczk.calcRateTargetAmount(rt.rate, rt.amount),
-                            rt.added ? m('small', ' → '+dczk.add(dczk.calcRateTargetAmount(rt.rate, rt.amount), dczk.calcRateTargetAmount(rt.rate, rt.added))) : '',
-                            rt.subtracted ? m('small', ' → '+dczk.sub(dczk.calcRateTargetAmount(rt.rate, rt.amount), dczk.calcRateTargetAmount(rt.rate, rt.subtracted))) : ''
+                            rt.added ? m('small', ' → ' + dczk.add(dczk.calcRateTargetAmount(rt.rate, rt.amount), dczk.calcRateTargetAmount(rt.rate, rt.added))) : '',
+                            rt.subtracted ? m('small', ' → ' + dczk.sub(dczk.calcRateTargetAmount(rt.rate, rt.amount), dczk.calcRateTargetAmount(rt.rate, rt.subtracted))) : ''
                           ])
                         ])
                       ])
@@ -882,7 +882,7 @@ const Page = {
         ])
       ]),
       m('.container', [
-        m('.section',{ style: 'padding-bottom: 0;' }, [
+        m('.section', { style: 'padding-bottom: 0;' }, [
           m('h2.title.is-4', 'Objednávky (posledních 10)'),
           m('.box', [
             m('table.table.is-fullwidth', [
@@ -893,7 +893,7 @@ const Page = {
                   m('th', 'DAI'),
                   m('th', 'dCZK'),
                   m('th', 'Kurz'),
-                  m('th', 'Transakce'),
+                  m('th', 'Transakce')
                 ])
               ]),
               m('tbody', [
@@ -912,13 +912,13 @@ const Page = {
                       m('div', { title: order.dczk }, num(order.dczk, 4))
                     ]),
                     m('td', [
-                      m('div', { title: order.dczk/order.dai }, num(order.dczk / order.dai))
+                      m('div', { title: order.dczk / order.dai }, num(order.dczk / order.dai))
                     ]),
                     m('td', [
                       m('a', { href: `https://kovan.etherscan.io/tx/${order.txid}`, target: '_blank' }, order.txid)
-                    ]),
+                    ])
                   ])
-                }),
+                })
               ])
             ])
           ])
@@ -933,7 +933,7 @@ const Page = {
                 m('tr', [
                   m('th', { width: 200 }, 'Čas'),
                   m('th', 'dCZK/DAI'),
-                  m('th', 'Transakce'),
+                  m('th', 'Transakce')
                 ])
               ]),
               m('tbody', [
@@ -947,9 +947,9 @@ const Page = {
                     ]),
                     m('td', [
                       m('a', { href: `https://kovan.etherscan.io/tx/${update.txid}`, target: '_blank' }, update.txid)
-                    ]),
+                    ])
                   ])
-                }),
+                })
               ])
             ])
           ])

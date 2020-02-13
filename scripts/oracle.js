@@ -1,7 +1,7 @@
 require('dotenv').config({ path: '../.env' })
 
-const Web3 = require("web3")
-const HDWalletProvider = require('truffle-hdwallet-provider');
+const Web3 = require('web3')
+const HDWalletProvider = require('truffle-hdwallet-provider')
 const fetch = require('node-fetch')
 
 const versions = require('../dapp/src/versions')
@@ -22,7 +22,7 @@ async function run () {
   console.log(`Account: ${user}`)
   console.log(`Balance: ${balance} ETH`)
   console.log(`Contract: ${addr} [v${v}]`)
-  console.log(`---`)
+  console.log('---')
 
   const contract = new web3.eth.Contract(abi, addr)
 
@@ -40,7 +40,8 @@ async function run () {
       })
   }
 
-  setInterval(async () => getRate().then(updateRate), 1000 * 60 * 10)
+  // run every 60 minutes
+  setInterval(async () => getRate().then(updateRate), 1000 * 60 * 60)
   // first run
   updateRate(await getRate())
 }

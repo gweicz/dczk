@@ -6,8 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "parcel src/index.html",
-    "deploy": "rm -rf deploy_build && parcel build -d deploy_build src/index.html && npm run deploy-git",
-    "deploy-git": "rm -rf deploy_build/.git && cd deploy_build && git init && git remote add origin git@github.com:gweicz/gweicz.github.io.git && git add . && git commit -m 'update' && git push --set-upstream origin master --force"
+    "deploy": "rm -rf deploy_build && parcel build -d deploy_build src/index.html && echo 'testnet-dczk.gwei.cz' > deploy_build/CNAME && npm run deploy-git",
+    "deploy-git": "rm -rf deploy_build/.git && cd deploy_build && git init && git remote add origin git@github.com:gweicz/gweicz.github.io.git && git checkout -b gh-pages && git add . && git commit -m 'update' && git push --set-upstream origin gh-pages --force"
   },
   "author": "",
   "license": "ISC",

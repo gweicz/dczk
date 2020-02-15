@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/gweicz/dCZK/master/dapp/src/img/dczk.png" width="130" height="130" align="right" />
+<img src="https://raw.githubusercontent.com/gweicz/dczk-frontend/master/src/img/dczk.png" width="130" height="130" align="right" />
 
 # dCZK DEX - Decentralizovaná Koruna
 
@@ -11,6 +11,9 @@ Jedná se o jednoúčelový a nezměnitelný [chytrý kontrakt](https://cs.wikip
 Neustálý dostatek likvidity zaručuje integrovaná směnárna (DEX), která je založená na principu tzv. *amortizační knihy*. Kdykoliv se vytvoří nové dCZK za DAI, tak se kurz a množstí zapíše do systému (kurz pro ražení nových mincí je vždy aktuální - dle Oracle) - to poté slouží jako objednávková kniha, pro ty co chtějí dCZK spálit a vrátit DAI (při *prodeji* dCZK se umořují *nákupy* podle *amortizační knihy* vždy od nevyššího kurzu pro DAI). Nikdy tedy nemůže nastat situace, kdy v systému nebude dostatek peněz na likvidaci existujících dCZK.
 
 Uložené rezervní DAI jsou automaticky uzamknuté v DSR ([Dai Savings Rate](https://ethereumprice.org/guides/article/dai-savings-rate-explained/)) a tak generují pozitivní úrok (v současnosti na ETH Mainnetu je to 7.50%). Tento úrok je automaticky přerozdělován držitelům dCZK v reálném čase každou sekundu.
+
+Pokud se o systému chcete dozvědět více, nebo máte-li nějaké připomínky či nápady, budeme rádi když se zastavíte na našem Discord serveru:
+* https://discord.gg/V2paCCg
 
 ## Rozcestník
 

@@ -34,7 +34,8 @@ async function run () {
   async function updateRate (rate) {
     const val = web3.utils.toWei(String(rate))
     console.log(`Updating rate: ${rate} [${val}]`)
-    contract.methods.updateRate(val).send({ from: user })
+    const nonce = await web3.eth.getTransactionCount(user)
+    contract.methods.updateRate(val).send({ from: user, nonce })
       .then(tx => {
         console.log(`DONE ---> tx: ${tx.transactionHash}`)
       })

@@ -4,17 +4,20 @@ const Web3 = require('web3')
 const HDWalletProvider = require('truffle-hdwallet-provider')
 const fetch = require('node-fetch')
 
-const versions = require('../dapp/src/versions')
-const v = Object.keys(versions)[0]
-const version = versions[v]
-const abi = version.abi
-const addr = version.dczk
+const v = '0.2'
+const build = require(`../builds/${v}/contracts/DCZK.json`)
+const abi = build.abi
+const addr = build.networks['42'].address
 const srcUrl = 'https://min-api.cryptocompare.com/data/pricemultifull?fsyms=DAI&tsyms=CZK'
 const srcPath = 'RAW.DAI.CZK.PRICE'
 
 async function run () {
-  const web3 = new Web3(new HDWalletProvider(process.env.WALLET_MNEMONIC, `https://kovan.infura.io/v3/${process.env.INFURA_KEY}`))
+  const web3 = new Web3(new HDWalletProvider(
+    process.env.WALLET_MNEMONIC,
+    `https://kovan.infura.io/v3/${process.env.INFURA_KEY}`
+  ))
   const accounts = await web3.eth.getAccounts()
+  console.log(accounts)
   const net = await web3.eth.net.getNetworkType()
   const user = accounts[0]
   const balance = web3.utils.fromWei(await web3.eth.getBalance(user))

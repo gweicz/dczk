@@ -79,4 +79,12 @@ Pokud máte nějaký lepší nápad, klidně se s tím svěřte v nové [Issue](
 ## Reference
 * https://github.com/warashibe/WJPY
 * https://github.com/makerdao/dss/blob/master/src/pot.sol
+* https://github.com/dapphub/chai/blob/master/src/chai.sol
 * https://github.com/aave/aave-protocol/blob/master/contracts/tokenization/AToken.sol
+
+## Autoři
+[gwei.cz](https://gwei.cz)
+
+## Licence
+
+BSD 2-Clause License

@@ -227,7 +227,7 @@ contract DCZK is IERC20 {
         return true;
     }
 
-    function _transfer(address sender, address recipient, uint256 amount) internal {
+    function _transfer(address sender, address recipient, uint256 amount) private {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
 
@@ -240,7 +240,7 @@ contract DCZK is IERC20 {
         emit TransferPrincipal(sender, recipient, pie, amount);
     }
 
-    function _approve(address owner, address spender, uint256 amount) internal {
+    function _approve(address owner, address spender, uint256 amount) private {
         require(owner != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
 
@@ -441,26 +441,26 @@ contract DCZK is IERC20 {
         }
     }
 
-    function buy(uint256 amount) public {
+    function buy(uint256 amount) external {
         require(depositToken.allowance(msg.sender, address(this)) >= amount, "dczk/insufficient-allowance");
         depositToken.transferFrom(msg.sender, address(this), amount);
         _buyAndMint(amount);
     }
 
-    function sell(uint256 amount) public {
+    function sell(uint256 amount) external {
         uint256 deposit = _sell(amount);
         _burn(msg.sender, amount, deposit, msg.sender);
     }
 
     // --- Uniswap Integration ---
 
-    function buyWithEther(uint256 minTokens) public payable returns(uint256 converted) {
+    function buyWithEther(uint256 minTokens) external payable returns(uint256 converted) {
         uint256 deposit = depositTokenExchange.ethToTokenSwapInput.value(msg.value)(minTokens, now + unidl);
         converted = _buyAndMint(deposit);
         emit BuyWithEther(msg.sender, converted, deposit, uint256(msg.value));
     }
 
-    function sellForEther(uint256 amount, uint256 minEth) public returns(uint256 eth) {
+    function sellForEther(uint256 amount, uint256 minEth) external returns(uint256 eth) {
         uint256 deposit = _sell(amount);
         _burn(msg.sender, amount, deposit, address(this));
         depositToken.approve(address(depositTokenExchange), deposit);
@@ -471,12 +471,12 @@ contract DCZK is IERC20 {
     function() external payable {
         require(msg.data.length == 0);
         uint256 price = depositTokenExchange.getEthToTokenInputPrice(msg.value);
-        buyWithEther(sub(price, price / unisl));
+        this.buyWithEther(sub(price, price / unisl));
     }
 
     // --- Oracle ---
 
-    function updateRate(uint _rate) public {
+    function updateRate(uint _rate) external {
         // TODO implement Chainlink or other oracle
         require(msg.sender == oracle, "dczk/permission-denied");
         rate = _rate;
@@ -486,7 +486,7 @@ contract DCZK is IERC20 {
 
     // --- DAO governance ---
 
-    function cast(uint8 key, uint256 num) public returns(bool) {
+    function cast(uint8 key, uint256 num) external returns(bool) {
         require(msg.sender == dao, "dczk/permission-denied");
         require(key <= 3, 'dczk/invalid-key');
         if (key == 0) cap = num;
@@ -497,7 +497,7 @@ contract DCZK is IERC20 {
         return true;
     }
 
-    function cast(uint8 key, address addr) public returns(bool) {
+    function cast(uint8 key, address addr) external returns(bool) {
         require(msg.sender == dao, "dczk/permission-denied");
         require(key <= 0, 'dczk/invalid-key');
         if (key == 0) oracle = addr;

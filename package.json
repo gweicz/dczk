@@ -4,6 +4,8 @@
   "description": "",
   "main": "truffle-config.js",
   "scripts": {
+    "deploy": "truffle migrate --network kovan",
+    "verify": "truffle run verify DCZK --network kovan",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",

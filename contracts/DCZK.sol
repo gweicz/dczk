@@ -58,7 +58,8 @@ contract DCZK is IERC20 {
     event RateUpdate(uint256 rate, address caller);
     event BuyWithEther(address indexed buyer, uint256 dczk, uint256 dai, uint256 eth);
     event SellForEther(address indexed seller, uint256 dczk, uint256 dai, uint256 eth);
-    event Debug(uint256 value);
+    event Cast(uint8 key, uint256 value);
+    event Cast(uint8 key, address value);
 
     // --- ERC20 basic vars ---
     string public constant name     = "dCZK Test v0.2.1";
@@ -68,31 +69,42 @@ contract DCZK is IERC20 {
     mapping (address => mapping (address => uint256)) private _allowances;
     uint256 private _totalSupply;
 
-    // --- Data ---
-    IERC20  public depositToken;
-    Vat     public vat;
-    DaiJoin public daiJoin;
-    Pot     public pot;
-    UniswapFactoryInterface  public uniswapFactory;
-    UniswapExchangeInterface public depositTokenExchange;
+    // --- DAO access ---
+    address public dao    = 0x89188bE35B16AF852dC0A4a9e47e0cA871fadf9a;
 
-    uint256 public lrho;
-    uint256 public lchi;
+    // --- DAO governed parameters ---
+    address public oracle = 0x89188bE35B16AF852dC0A4a9e47e0cA871fadf9a;
+    uint256 public cap    = 1000000000000000000000000;
+    uint256 public fee    = 400;           // 0.25%
+    uint256 public unidl  = 900 * 60;      // uniswap deadline - 15 minutes
+    uint256 public unisl  = 40;            // uniswap slippage - 2.5%
+
+    // --- Oracle variables ---
     uint256 public rate = 22000000000000000000;
-
-    // fixed oracleAdress - will be not included in mainnet release
-    address public constant oracleAddress = 0x89188bE35B16AF852dC0A4a9e47e0cA871fadf9a;
-    uint256 public constant fee = 400;             // 0.25%
-    uint256 constant uniswapDeadline = 900 * 60;   // 15 minutes
-
-    uint256 public maxRate;
-    uint256 public totalVolume;
     uint256 public lastUpdate;
+
+    // --- DEX ---
+    uint256 public maxRate;
+    uint256 public volume;
     struct Thread {
         uint next;
         uint amount;
     }
     mapping(uint => Thread) public txs;
+
+    // --- Maker DSR ---
+    IERC20  public depositToken;
+    Vat     public vat;
+    DaiJoin public daiJoin;
+    Pot     public pot;
+
+    // --- Local savings rate ---
+    uint256 public lrho;
+    uint256 public lchi;
+
+    // --- Uniswap ---
+    UniswapFactoryInterface  public uniswapFactory;
+    UniswapExchangeInterface public depositTokenExchange;
 
 
     // --- Init ---
@@ -119,7 +131,7 @@ contract DCZK is IERC20 {
     // Taken from official DSR contract:
     // https://github.com/makerdao/dss/blob/master/src/pot.sol
 
-    /*uint constant RAY = 10 ** 27;
+    uint constant RAY = 10 ** 27;
     function rpow(uint x, uint n, uint base) internal pure returns (uint z) {
         assembly {
             switch x case 0 {switch n case 0 {z := base} default {z := 0}}
@@ -142,7 +154,7 @@ contract DCZK is IERC20 {
                 }
             }
         }
-    }*/
+    }
 
     function add(uint x, uint y) internal pure returns (uint z) {
         require((z = x + y) >= x);
@@ -279,8 +291,9 @@ contract DCZK is IERC20 {
 
     function _mint(address dst, uint256 czk, uint256 dai) private {
         require(dst != address(0), "ERC20: mint to the zero address");
-
+        
         uint256 chi = (now > pot.rho()) ? pot.drip() : pot.chi();
+
         uint pie = rdiv(dai, chi);
         daiJoin.join(address(this), dai);
         pot.join(pie);
@@ -288,6 +301,8 @@ contract DCZK is IERC20 {
 
         _totalSupply = add(_totalSupply, spie);
         _balances[dst] = add(_balances[dst], spie);
+
+        require(rmul(chi, _totalSupply) <= cap, "dczk/cap-reached");
 
         emit Transfer(address(0), dst, czk);
         emit TransferPrincipal(address(0), dst, spie, czk);
@@ -362,7 +377,7 @@ contract DCZK is IERC20 {
         converted = (rest * rate) / 10 ** 18;
 
         // save amount to total volume
-        totalVolume += converted;
+        volume += converted;
 
         // mint tokens
         _mint(address(msg.sender), converted, rest);
@@ -376,7 +391,7 @@ contract DCZK is IERC20 {
         _drip();
 
         // update total volume
-        totalVolume += amount;
+        volume += amount;
 
         // calculate rate & deposit
         uint _amount = amount;
@@ -440,7 +455,7 @@ contract DCZK is IERC20 {
     // --- Uniswap Integration ---
 
     function buyWithEther(uint256 minTokens) public payable returns(uint256 converted) {
-        uint256 deposit = depositTokenExchange.ethToTokenSwapInput.value(msg.value)(minTokens, now + uniswapDeadline);
+        uint256 deposit = depositTokenExchange.ethToTokenSwapInput.value(msg.value)(minTokens, now + unidl);
         converted = _buyAndMint(deposit);
         emit BuyWithEther(msg.sender, converted, deposit, uint256(msg.value));
     }
@@ -449,23 +464,44 @@ contract DCZK is IERC20 {
         uint256 deposit = _sell(amount);
         _burn(msg.sender, amount, deposit, address(this));
         depositToken.approve(address(depositTokenExchange), deposit);
-        eth = depositTokenExchange.tokenToEthTransferInput(deposit, minEth, now + uniswapDeadline, msg.sender);
+        eth = depositTokenExchange.tokenToEthTransferInput(deposit, minEth, now + unidl, msg.sender);
         emit SellForEther(msg.sender, amount, deposit, eth);
     }
 
-    function () external payable {
+    function() external payable {
         require(msg.data.length == 0);
         uint256 price = depositTokenExchange.getEthToTokenInputPrice(msg.value);
-        buyWithEther(sub(price, price / 40));
+        buyWithEther(sub(price, price / unisl));
     }
 
     // --- Oracle ---
 
     function updateRate(uint _rate) public {
         // TODO implement Chainlink or other oracle
-        require(msg.sender == oracleAddress, "dczk/permission-denied");
+        require(msg.sender == oracle, "dczk/permission-denied");
         rate = _rate;
         lastUpdate = now;
         emit RateUpdate(rate, msg.sender);
+    }
+
+    // --- DAO governance ---
+
+    function cast(uint8 key, uint256 num) public returns(bool) {
+        require(msg.sender == dao, "dczk/permission-denied");
+        require(key <= 3, 'dczk/invalid-key');
+        if (key == 0) cap = num;
+        if (key == 1) fee = num;
+        if (key == 2) unidl = num;
+        if (key == 3) unisl = num;
+        emit Cast(key, num);
+        return true;
+    }
+
+    function cast(uint8 key, address addr) public returns(bool) {
+        require(msg.sender == dao, "dczk/permission-denied");
+        require(key <= 0, 'dczk/invalid-key');
+        if (key == 0) oracle = addr;
+        emit Cast(key, addr);
+        return true;
     }
 }

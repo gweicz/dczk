@@ -219,8 +219,7 @@ contract DCZK is IERC20 {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
 
-        uint256 chi = (now > pot.rho()) ? pot.drip() : pot.chi();
-        uint pie = rdiv(amount, chi);
+        uint pie = rdiv(amount, _chi());
 
         _balances[sender] = sub(_balances[sender], pie, "ERC20: transfer amount exceeds balance");
         _balances[recipient] = add(_balances[recipient], pie);
@@ -350,7 +349,6 @@ contract DCZK is IERC20 {
 
     function _buyAndMint(uint256 amount) private returns(uint256 converted) {
         require(rate != 0, "rate cannot be 0");
-        _drip();
 
         // calculate fee - 0.25%
         uint _fee = amount / fee;

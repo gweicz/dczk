@@ -4,8 +4,8 @@ const Web3 = require('web3')
 const HDWalletProvider = require('truffle-hdwallet-provider')
 const fetch = require('node-fetch')
 
-const v = '0.2'
-const build = require(`../builds/${v}/contracts/DCZK.json`)
+const v = '0.3'
+const build = require(`../builds/${v}/contracts/Oracle.json`)
 const abi = build.abi
 const addr = build.networks['42'].address
 const srcUrl = 'https://min-api.cryptocompare.com/data/pricemultifull?fsyms=DAI&tsyms=CZK'
@@ -38,7 +38,7 @@ async function run () {
     const val = web3.utils.toWei(String(rate))
     console.log(`Updating rate: ${rate} [${val}]`)
     const nonce = await web3.eth.getTransactionCount(user)
-    contract.methods.updateRate(val).send({ from: user, nonce })
+    contract.methods.update(val).send({ from: user, nonce })
       .then(tx => {
         console.log(`DONE ---> tx: ${tx.transactionHash}`)
       })

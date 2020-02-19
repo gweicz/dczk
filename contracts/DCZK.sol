@@ -1,4 +1,4 @@
-/// DCZK.sol -- CZK Decentralized Stablecoin
+/// DCZK.sol -- dCZK Decentralized Stablecoin
 
 pragma solidity ^0.5.16;
 
@@ -42,6 +42,10 @@ contract UniswapExchangeInterface {
     function tokenToEthTransferInput(uint256 tokens_sold, uint256 min_eth, uint256 deadline, address recipient) external returns (uint256  eth_bought);
 }
 
+contract IOracle {
+    function value() external view returns (uint256);
+}
+
 contract DCZK is IERC20 {
 
     // --- ERC20 Events ---
@@ -55,33 +59,31 @@ contract DCZK is IERC20 {
     event Buy(address indexed buyer, uint256 dczk, uint256 dai);
     event Sell(address indexed seller, uint256 dczk, uint256 dai);
     event AddLiquidity(uint256 rate, uint256 amount);
-    event RateUpdate(uint256 rate, address caller);
     event BuyWithEther(address indexed buyer, uint256 dczk, uint256 dai, uint256 eth);
     event SellForEther(address indexed seller, uint256 dczk, uint256 dai, uint256 eth);
-    event Cast(uint8 key, uint256 value);
-    event Cast(uint8 key, address value);
+    event Cast(uint8 key, bytes32 val);
 
     // --- ERC20 basic vars ---
-    string public constant name     = "dCZK Test v0.2.1";
-    string public constant symbol   = "dCZK021";
+    string public constant name     = "dCZK Test v0.3";
+    string public constant symbol   = "dCZK03";
     uint8  public constant decimals = 18;
-    mapping (address => uint256) private _balances;
+    mapping (address => uint256)private _balances;
     mapping (address => mapping (address => uint256)) private _allowances;
     uint256 private _totalSupply;
 
     // --- DAO access ---
-    address public dao    = 0x89188bE35B16AF852dC0A4a9e47e0cA871fadf9a;
+    address public dao;
 
     // --- DAO governed parameters ---
-    address public oracle = 0x89188bE35B16AF852dC0A4a9e47e0cA871fadf9a;
-    uint256 public cap    = 1000000000000000000000000;
-    uint256 public fee    = 400;           // 0.25%
-    uint256 public unidl  = 900 * 60;      // uniswap deadline - 15 minutes
-    uint256 public unisl  = 40;            // uniswap slippage - 2.5%
+    address public oracle;    // oracle contract address
+    uint256 public cap;       // maximal supply
+    uint256 public fee;       // buy() fee
+    address public unifa;     // uniswap factory contract
+    uint256 public unisl;     // uniswap slippage
+    uint256 public unidl;     // uniswap deadline
 
-    // --- Oracle variables ---
-    uint256 public rate = 22000000000000000000;
-    uint256 public lastUpdate;
+    // --- Maker DAI ---
+    IERC20  public dai;
 
     // --- DEX ---
     uint256 public maxRate;
@@ -93,7 +95,6 @@ contract DCZK is IERC20 {
     mapping(uint => Thread) public txs;
 
     // --- Maker DSR ---
-    IERC20  public depositToken;
     Vat     public vat;
     DaiJoin public daiJoin;
     Pot     public pot;
@@ -104,27 +105,40 @@ contract DCZK is IERC20 {
 
     // --- Uniswap ---
     UniswapFactoryInterface  public uniswapFactory;
-    UniswapExchangeInterface public depositTokenExchange;
+    UniswapExchangeInterface public daiExchange;
 
 
     // --- Init ---
-    constructor (address _dai, address _vat, address _daiJoin, address _pot, address _uniswapFactory) public {
-        // set DAI address
-        depositToken = IERC20(_dai);
+    constructor (address _oracle) public {
+        
+        // core
+        dai = IERC20(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa);
+        dao = 0x89188bE35B16AF852dC0A4a9e47e0cA871fadf9a;
+
+        // default dao controlled parameters
+        oracle = _oracle;
+        cap    = 1000000000000000000000000;
+        fee    = 400;           // 0.25%
+        unifa  = 0xD3E51Ef092B2845f10401a0159B2B96e8B6c3D30;
+        unisl  = 40;            // uniswap slippage - 2.5%
+        unidl  = 900 * 60;      // uniswap deadline - 15 minutes
 
         // DSR - DAI Savings Rate
-        daiJoin = DaiJoin(_daiJoin);
-        vat = Vat(_vat);
-        pot = Pot(_pot);
-        // pot = new Pot(address(this));           // MakerDAO DSR `pot` (for testing purposes)
+        daiJoin = DaiJoin(0x5AA71a3ae1C0bd6ac27A1f28e1415fFFB6F15B8c);
+        vat = Vat(0xbA987bDB501d131f766fEe8180Da5d81b34b69d9);
+        pot = Pot(0xEA190DBDC7adF265260ec4dA6e9675Fd4f5A78bb);
+
         vat.hope(address(daiJoin));
         vat.hope(address(pot));
 
         // Uniswap
-        uniswapFactory = UniswapFactoryInterface(_uniswapFactory);
-        depositTokenExchange = UniswapExchangeInterface(uniswapFactory.getExchange(address(depositToken)));
+        uniswapFactory = UniswapFactoryInterface(unifa);
+        daiExchange = UniswapExchangeInterface(uniswapFactory.getExchange(address(dai)));
 
-        depositToken.approve(address(daiJoin), uint(-1));
+        dai.approve(address(daiJoin), uint256(-1));
+
+        // first drip
+        _drip();
     }
 
     // --- Math ---
@@ -271,8 +285,10 @@ contract DCZK is IERC20 {
         lchi = tmp;
         lrho = now;
         uint amount = rmul(chi_, principalPotSupply());
-        _addLiquidity(amount);
-        emit AddLiquidity(rate, amount);
+        if (amount > 0) {
+          _addLiquidity(amount);
+          emit AddLiquidity(rate(), amount);
+        }
     }
 
     function potDrip() public view returns (uint) {
@@ -289,13 +305,13 @@ contract DCZK is IERC20 {
 
     // --- Minting and burning (internal) ---
 
-    function _mint(address dst, uint256 czk, uint256 dai) private {
+    function _mint(address dst, uint256 czk, uint256 _dai) private {
         require(dst != address(0), "ERC20: mint to the zero address");
         
         uint256 chi = (now > pot.rho()) ? pot.drip() : pot.chi();
 
-        uint pie = rdiv(dai, chi);
-        daiJoin.join(address(this), dai);
+        uint pie = rdiv(_dai, chi);
+        daiJoin.join(address(this), _dai);
         pot.join(pie);
         uint spie = rdiv(czk, chi);
 
@@ -309,7 +325,7 @@ contract DCZK is IERC20 {
         emit Mint(dst, czk, spie);
     }
 
-    function _burn(address src, uint256 czk, uint256 dai, address dst) private {
+    function _burn(address src, uint256 czk, uint256 _dai, address dst) private {
         require(src != address(0), "ERC20: burn from the zero address");
         require(balanceOf(src) >= czk, "dczk/insufficient-balance");
 
@@ -321,7 +337,7 @@ contract DCZK is IERC20 {
         emit Transfer(src, address(0), czk);
         emit Burn(src, czk, spie);
 
-        uint pie = rdivup(dai, chi);
+        uint pie = rdivup(_dai, chi);
         if (pie != 0) {
             pot.exit(pie);
             daiJoin.exit(dst, rmul(chi, pie));
@@ -335,10 +351,11 @@ contract DCZK is IERC20 {
     // --- DEX Decentralized exchange ---
 
     function _addLiquidity(uint256 amount) internal {
-        if (txs[rate].amount == 0 && maxRate != 0) {
+        uint256 _rate = rate();
+        if (txs[_rate].amount == 0 && maxRate != 0) {
             uint currentRate = maxRate;
             uint prevRate = 0;
-            while (currentRate >= rate){
+            while (currentRate >= _rate){
                 prevRate = currentRate;
                 if (txs[currentRate].next != 0) {
                     currentRate = txs[currentRate].next;
@@ -346,24 +363,24 @@ contract DCZK is IERC20 {
                     currentRate = 0;
                 }
             }
-            if (currentRate != rate) {
+            if (currentRate != _rate) {
                 if (prevRate == 0) {
-                    txs[rate].next = maxRate;
-                    maxRate = rate;
+                    txs[_rate].next = maxRate;
+                    maxRate = _rate;
                 } else {
-                    txs[prevRate].next = rate;
-                    txs[rate].next = currentRate;
+                    txs[prevRate].next = _rate;
+                    txs[_rate].next = currentRate;
                 }
             }
         }
-        if (maxRate < rate) {
-            maxRate = rate;
+        if (maxRate < _rate) {
+            maxRate = _rate;
         }
-        txs[rate].amount += amount;
+        txs[_rate].amount += amount;
     }
 
     function _buyAndMint(uint256 amount) private returns(uint256 converted) {
-        require(rate != 0, "rate cannot be 0");
+        require(rate() != 0, "rate cannot be 0");
 
         // calculate fee - 0.25%
         uint _fee = amount / fee;
@@ -374,7 +391,7 @@ contract DCZK is IERC20 {
         _addLiquidity(rest);
 
         // convert to stablecoin amount
-        converted = (rest * rate) / 10 ** 18;
+        converted = (rest * rate()) / 10 ** 18;
 
         // save amount to total volume
         volume += converted;
@@ -442,8 +459,8 @@ contract DCZK is IERC20 {
     }
 
     function buy(uint256 amount) external {
-        require(depositToken.allowance(msg.sender, address(this)) >= amount, "dczk/insufficient-allowance");
-        depositToken.transferFrom(msg.sender, address(this), amount);
+        require(dai.allowance(msg.sender, address(this)) >= amount, "dczk/insufficient-allowance");
+        dai.transferFrom(msg.sender, address(this), amount);
         _buyAndMint(amount);
     }
 
@@ -455,7 +472,7 @@ contract DCZK is IERC20 {
     // --- Uniswap Integration ---
 
     function buyWithEther(uint256 minTokens) external payable returns(uint256 converted) {
-        uint256 deposit = depositTokenExchange.ethToTokenSwapInput.value(msg.value)(minTokens, now + unidl);
+        uint256 deposit = daiExchange.ethToTokenSwapInput.value(msg.value)(minTokens, now + unidl);
         converted = _buyAndMint(deposit);
         emit BuyWithEther(msg.sender, converted, deposit, uint256(msg.value));
     }
@@ -463,45 +480,44 @@ contract DCZK is IERC20 {
     function sellForEther(uint256 amount, uint256 minEth) external returns(uint256 eth) {
         uint256 deposit = _sell(amount);
         _burn(msg.sender, amount, deposit, address(this));
-        depositToken.approve(address(depositTokenExchange), deposit);
-        eth = depositTokenExchange.tokenToEthTransferInput(deposit, minEth, now + unidl, msg.sender);
+        dai.approve(address(daiExchange), deposit);
+        eth = daiExchange.tokenToEthTransferInput(deposit, minEth, now + unidl, msg.sender);
         emit SellForEther(msg.sender, amount, deposit, eth);
     }
 
     function() external payable {
         require(msg.data.length == 0);
-        uint256 price = depositTokenExchange.getEthToTokenInputPrice(msg.value);
+        uint256 price = daiExchange.getEthToTokenInputPrice(msg.value);
         this.buyWithEther(sub(price, price / unisl));
     }
 
     // --- Oracle ---
 
-    function updateRate(uint _rate) external {
-        // TODO implement Chainlink or other oracle
-        require(msg.sender == oracle, "dczk/permission-denied");
-        rate = _rate;
-        lastUpdate = now;
-        emit RateUpdate(rate, msg.sender);
+    function rate() public view returns(uint256) {
+      return IOracle(oracle).value();
+    }
+
+    function collect() external {
+      require(msg.sender == oracle, "dczk/permission-denied");
+      uint256 fees = dai.balanceOf(address(this));
+      dai.transfer(msg.sender, fees);
     }
 
     // --- DAO governance ---
+    //
+    //  uint256 -> bytes32 : web3.utils.padLeft(web3.utils.numberToHex(wei), 64)
+    //  address -> bytes32 : web3.utils.padLeft(address, 64)
 
-    function cast(uint8 key, uint256 num) external returns(bool) {
+    function cast(uint8 key, bytes32 val) external returns(bool) {
         require(msg.sender == dao, "dczk/permission-denied");
-        require(key <= 3, 'dczk/invalid-key');
-        if (key == 0) cap = num;
-        if (key == 1) fee = num;
-        if (key == 2) unidl = num;
-        if (key == 3) unisl = num;
-        emit Cast(key, num);
-        return true;
-    }
-
-    function cast(uint8 key, address addr) external returns(bool) {
-        require(msg.sender == dao, "dczk/permission-denied");
-        require(key <= 0, 'dczk/invalid-key');
-        if (key == 0) oracle = addr;
-        emit Cast(key, addr);
+        require(key <= 5, 'dczk/invalid-key');
+        if (key == 0) oracle = address(uint160(uint256(val)));
+        if (key == 1) cap    = uint256(val);
+        if (key == 2) fee    = uint256(val);
+        if (key == 3) unifa  = address(uint160(uint256(val)));
+        if (key == 4) unisl  = uint256(val);
+        if (key == 5) unidl  = uint256(val);
+        emit Cast(key, val);
         return true;
     }
 }

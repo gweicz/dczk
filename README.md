@@ -1,6 +1,7 @@
-<img src="https://raw.githubusercontent.com/gweicz/dczk-frontend/master/src/img/dczk.png" width="130" height="130" align="right" />
+<p align="center"><img src="https://raw.githubusercontent.com/gweicz/dczk-frontend/master/src/img/dczk.png" width="130" height="130" /></p>
 
 # dCZK DEX - Decentralizovaná Koruna
+
 
 > **Upozornění: Projekt je zatím ve fázi vývoje a je dostupný pouze na Ethereum Testnetu (Kovan). Použití na vlastní riziko.**
 
@@ -26,7 +27,8 @@ Pokud se o systému chcete dozvědět více, nebo máte-li nějaké připomínky
 ## Publikované verze (testnet)
 Datum          | Verze   | Síť       | Adresa kontraktu  | ABI
 ---            | ---     | ---       | ---               | ---
-**2020-02-12** | **0.2** | **Kovan** | **[0x27De52bed4BD1aAf4F8fAcDB494Bc6527D5B93b1](https://kovan.etherscan.io/address/0x27de52bed4bd1aaf4f8facdb494bc6527d5b93b1)** | **[ABI](https://raw.githubusercontent.com/gweicz/dCZK/master/dapp/src/abi/DCZK/0.2/DCZK.json)**
+**2020-02-20** | **0.3** | **Kovan** | **[0x621949FE9028A687aB9a3C04F6c6d6ab36A2E5db](https://kovan.etherscan.io/address/0x621949FE9028A687aB9a3C04F6c6d6ab36A2E5db)** | **[ABI](https://raw.githubusercontent.com/gweicz/dCZK/master/dapp/src/abi/DCZK/0.3/DCZK.json)**
+2020-02-12     | 0.2     | Kovan     | [0x27De52bed4BD1aAf4F8fAcDB494Bc6527D5B93b1](https://kovan.etherscan.io/address/0x27de52bed4bd1aaf4f8facdb494bc6527d5b93b1) | [ABI](https://raw.githubusercontent.com/gweicz/dCZK/master/dapp/src/abi/DCZK/0.2/DCZK.json)
 2020-02-09     | 0.1     | Kovan     | [0x1807123556d328E1eff32C2c743B89E079CE1f65](https://kovan.etherscan.io/address/0x1807123556d328E1eff32C2c743B89E079CE1f65) | [ABI](https://raw.githubusercontent.com/gweicz/dCZK/master/dapp/src/abi/DCZK/0.1/DCZK.json)
 
 Pozn. tučně je aktuální výchozí verze na [testnet-dczk.gwei.cz](https://testnet-dczk.gwei.cz/).

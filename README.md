@@ -2,6 +2,8 @@
 
 # dCZK DEX - Decentralizovaná Koruna
 
+## PROJEKT POZASTAVEN - následující informace jsou neaktuální
+
 
 > **Upozornění: Projekt je zatím ve fázi vývoje a je dostupný pouze na Ethereum Testnetu (Kovan). Použití na vlastní riziko.**
 
